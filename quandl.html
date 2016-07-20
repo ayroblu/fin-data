@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <!-- The first thing in any HTML file should be the charset -->
+  <meta charset="utf-8">
+  <!-- Make the page mobile compatible -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Allow installing the app to the homescreen -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Quandl try</title>
+  <style>
+* {
+  text-align:center;
+  font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif ;
+  font-weight: 300;
+  padding:0;
+  margin:0;
+  vertical-align:top;
+}
+*:focus{
+  outline: none
+  box-shadow:0 0 6px #999
+}
+b{
+  font-weight:bold;
+}
+html,body{
+  height:100%;
+}
+p{
+  line-height: 1.6em;
+  color:#444;
+}
+ul{
+  list-style-type: none;
+}
+a{
+  text-decoration:none;
+}
+pre{
+  white-space: pre-wrap;
+  word-wrap: break-word;      /* Internet Explorer 5.5+ */
+}
+input{
+  text-align:left;
+}
+.noselect{
+  -webkit-touch-callout: none; /* iOS Safari */
+  -webkit-user-select: none;   /* Chrome/Safari/Opera */
+  -khtml-user-select: none;    /* Konqueror */
+  -moz-user-select: none;      /* Firefox */
+  -ms-user-select: none;       /* Internet Explorer/Edge */
+  user-select: none;           /* Non-prefixed version, currently
+                                  not supported by any browser */
+}
+table{
+  border-collapse:collapse
+}
+#app{
+  overflow-x:auto;
+}
+.list{
+  padding:10px
+}
+.list th,.list td{
+  padding:5px;
+  border:1px solid #000;
+}
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="list">
+    <table>
+      <thead>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+function CSVToArray( strData, strDelimiter ){
+  // Check to see if the delimiter is defined. If not,
+  // then default to comma.
+  strDelimiter = (strDelimiter || ",");
+
+  // Create a regular expression to parse the CSV values.
+  var objPattern = new RegExp((
+    // Delimiters.
+    "(\\" + strDelimiter + "|\\r?\\n|\\r|^)" +
+
+    // Quoted fields.
+    "(?:\"([^\"]*(?:\"\"[^\"]*)*)\"|" +
+
+    // Standard fields.
+    "([^\"\\" + strDelimiter + "\\r\\n]*))"
+  ), "gi");
+
+  var arrData = [[]];
+  var arrMatches = null;
+  while (arrMatches = objPattern.exec( strData )){
+      var strMatchedDelimiter = arrMatches[ 1 ];
+      if (strMatchedDelimiter.length && strMatchedDelimiter !== strDelimiter){
+        arrData.push([]);
+      }
+      var strMatchedValue;
+      if (arrMatches[ 2 ]){
+        strMatchedValue = arrMatches[ 2 ].replace(new RegExp( "\"\"", "g" ), "\"");
+      } else {
+        strMatchedValue = arrMatches[ 3 ];
+      }
+      arrData[ arrData.length - 1 ].push( strMatchedValue );
+  }
+  return( arrData );
+}
+var Tests = {
+  run(){
+    // Nothing yet...
+  }
+, checkSomething(){
+  }
+}
+var Quandl = {
+  convertCsv: true
+, getListOfDatabases(callback){
+    var url = 'https://www.quandl.com/api/v3/databases.csv'
+    fetch(url).then(res=>{
+      if (res.ok){
+        return res.text();
+      }
+      var error = new Error(res.statusText)
+      error.response = res
+      throw error
+    }).then(text=>{
+      if (this.convertCsv){
+        var data = CSVToArray(text);
+        callback(data);
+      } else {
+        callback(text);
+      }
+    }).catch(this.handleError.bind(this));
+  }
+, getListOfDataSetsInDatabases(dbCode, callback){
+    //var url = 'https://www.quandl.com/api/v3/databases.csv'
+    var url = `https://www.quandl.com/api/v3/databases/${dbCode}/codes.csv`
+    fetch(url).then(res=>{
+      if (res.ok){
+        return res.text();
+      }
+      var error = new Error(res.statusText)
+      error.response = res
+      throw error
+    }).then(text=>{
+      if (this.convertCsv){
+        var data = CSVToArray(text);
+        callback(data);
+      } else {
+        callback(text);
+      }
+    }).catch(this.handleError.bind(this));
+  }
+, handleError(err){
+    console.error('Error in Quandl:', err);
+  }
+}
+var app = document.getElementById('app')
+var table = app.querySelector('table')
+var Displayer = {
+  thead: table.querySelector('thead')
+, tbody: table.querySelector('tbody')
+, showTable(headers, bodyData){
+    this.thead.innerHTML = ''
+    this.tbody.innerHTML = ''
+    var imageColIdx = headers ? headers[0].indexOf('image') : -1
+    headers.forEach(header=>{
+      var tr = document.createElement('tr')
+      header.forEach(colName=>{
+        var th = document.createElement('th')
+        th.innerText = colName
+        tr.appendChild(th);
+      });
+      this.thead.appendChild(tr)
+    })
+    bodyData.forEach(rowData=>{
+      var tr = document.createElement('tr')
+      rowData.forEach((colText,idx)=>{
+        var td = document.createElement('td')
+        if (idx === imageColIdx){
+          var img = document.createElement('img')
+          img.src = colText
+          td.appendChild(img);
+        } else {
+          td.innerText = colText
+        }
+        tr.appendChild(td);
+      });
+      this.tbody.appendChild(tr)
+    })
+  }
+}
+window.onload = function(){
+  Tests.run();
+  Quandl.getListOfDatabases(data=>{
+    var headers = data.splice(0,1)
+    var bodyData = data.slice(0,-1)
+    Displayer.showTable(headers, bodyData)
+    var codeIdx = headers ? headers[0].indexOf('database_code') : -1
+    if (codeIdx === -1) {
+      console.log('No code:', codeIdx);
+      return
+    }
+    var codes = bodyData.map(d=>d[codeIdx]);
+    codes.forEach(code=>{
+      console.log('code: ', code);
+      Quandl.getListOfDataSetsInDatabases(code, data=>{
+        console.log(code, data);
+      })
+    });
+  });
+}
+</script>
+</body>
+</html>
+
